@@ -224,7 +224,15 @@ public class CS2150Coursework extends GraphicsLab
 
 
 
-		GL11.glEnable(GL11.GL_DEPTH_TEST);
+		//GL11.glEnable(GL11.GL_DEPTH_TEST);
+		
+		try {
+			org.lwjgl.input.Cursor emptyCursor = new org.lwjgl.input.Cursor(1, 1, 0, 0, 1, BufferUtils.createIntBuffer(1), null);
+			Mouse.setNativeCursor(emptyCursor);
+		} catch (LWJGLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	protected void checkSceneInput()
@@ -563,16 +571,8 @@ public class CS2150Coursework extends GraphicsLab
 
 				GL11.glBegin(GL11.GL_QUADS);
 				{
-					/*try {
-						org.lwjgl.input.Cursor emptyCursor = new org.lwjgl.input.Cursor(1, 1, 0, 0, 1, BufferUtils.createIntBuffer(1), null);
-						Mouse.setNativeCursor(emptyCursor);
-					} catch (LWJGLException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}*/
 					float fixedMouseY = 600 - Mouse.getY();
 
-					//GL11.glColor3f(1.0f, 0.0f, 0.0f);
 					GL11.glVertex2f(Mouse.getX() - 5, fixedMouseY - 5);
 					GL11.glVertex2f(Mouse.getX() + 5, fixedMouseY - 5);
 					GL11.glVertex2f(Mouse.getX() + 5, fixedMouseY + 5);
