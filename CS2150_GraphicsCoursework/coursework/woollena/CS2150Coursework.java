@@ -70,10 +70,12 @@ import java.util.Iterator;
 import java.util.LinkedList;
 
 import org.lwjgl.BufferUtils;
+import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.newdawn.slick.opengl.Texture;
 import GraphicsLab.*;
+import javafx.scene.Cursor;
 import javafx.scene.paint.Color;
 
 /**
@@ -131,14 +133,18 @@ public class CS2150Coursework extends GraphicsLab
 	 * </p>
 	 */
 	private Texture woodFloorTexture;
+	/** 
+	 * ids for nearest, linear and mipmapped textures for the transparent plane
+	 */
+	private Texture plainWhiteTexture;
 
 	//Animation variables
 	private Vector3f tankPosition;
 	private float turretRotation;
 	private LinkedList<BulletData> bullets;
 	private boolean makeBullet;
-	private float makeBulletDelay;
-	
+	private boolean lastBulletInputState;
+
 	java.nio.FloatBuffer mouseWorldPos;
 	float moveLevelX;
 	float moveLevelY;
@@ -159,22 +165,22 @@ public class CS2150Coursework extends GraphicsLab
 		turretRotation = 0;
 		bullets = new LinkedList<BulletData>();
 		makeBullet = false;
-		makeBulletDelay = 0;
-		
+		lastBulletInputState = false;
+
 		mouseWorldPos = BufferUtils.createFloatBuffer(3);
 		mouseWorldPos.put(0, 0.0f);
 		mouseWorldPos.put(1, 0.0f);
 		mouseWorldPos.put(2, 0.0f);
-		
+
 		moveLevelX = 0.0f;
 		moveLevelY = -7.0f;
 		moveLevelZ = -7.0f;
-		
+
 		//Load the textures
 		testTexture = loadTexture("coursework/woollena/textures/test.bmp");
 		tankMainTexture = loadTexture("coursework/woollena/textures/tankTextureMain.bmp");
 		woodFloorTexture = loadTexture("coursework/woollena/textures/woodFloor.bmp");
-
+		plainWhiteTexture = loadTexture("coursework/woollena/textures/plainWhite.bmp");
 
 		// Global ambient light level
 		float globalAmbient[] = {1f,  1f,  1f, 1.0f};
@@ -225,35 +231,38 @@ public class CS2150Coursework extends GraphicsLab
 	{
 		//TODO: Check for keyboard and mouse input here
 
-		if(Keyboard.isKeyDown(Keyboard.KEY_RIGHT)){
+		//No longer needed because turret now follows mouse
+		/*if(Keyboard.isKeyDown(Keyboard.KEY_RIGHT)){
 			turretRotation = (turretRotation - (5.0f * getAnimationScale())) % 360;
 		}
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_LEFT)){
 			turretRotation = (turretRotation + (5.0f * getAnimationScale())) % 360;
-		}
+		}*/
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_A)){
-			tankPosition.translate(-0.2f * getAnimationScale(), 0, 0);
+			tankPosition.translate(-0.13f * getAnimationScale(), 0, 0);
 		}
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_D)){
-			tankPosition.translate(0.2f * getAnimationScale(), 0, 0);
+			tankPosition.translate(0.13f * getAnimationScale(), 0, 0);
 		}
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_W)){
-			tankPosition.translate(0, 0, -0.2f * getAnimationScale());
+			tankPosition.translate(0, 0, -0.13f * getAnimationScale());
 		}
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_S)){
-			tankPosition.translate(0, 0, 0.2f * getAnimationScale());
+			tankPosition.translate(0, 0, 0.13f * getAnimationScale());
 		}
 
-		if(Keyboard.isKeyDown(Keyboard.KEY_SPACE)){
-			if(makeBulletDelay >= 0.5f){
+		if(Keyboard.isKeyDown(Keyboard.KEY_SPACE) || Mouse.isButtonDown(0)){
+			if(lastBulletInputState == false){
 				makeBullet = true;
-				makeBulletDelay = 0;
 			}
+			lastBulletInputState = true;
+		} else{
+			lastBulletInputState = false;
 		}
 
 	}
@@ -263,10 +272,9 @@ public class CS2150Coursework extends GraphicsLab
 		//TODO: Update your scene variables here - remember to use the current animation scale value
 		//        (obtained via a call to getAnimationScale()) in your modifications so that your animations
 		//        can be made faster or slower depending on the machine you are working on
-		makeBulletDelay += 0.1 * getAnimationScale();
-		
-		
-		
+
+
+
 	}
 
 	protected void renderScene()
@@ -283,14 +291,15 @@ public class CS2150Coursework extends GraphicsLab
 			lastTime = System.currentTimeMillis();
 		}
 
-		GL11.glTranslatef(moveLevelX, moveLevelY, moveLevelZ);
 
+		GL11.glTranslatef(moveLevelX, moveLevelY, moveLevelZ);
 
 
 		//Draw ground
 		GL11.glPushMatrix();
 		{
-			GL11.glTranslatef(0.0f, -1.5f, -0.0f);
+
+			GL11.glTranslatef(0.0f, -1.5f, 0.0f);
 			GL11.glPushMatrix();
 			{
 				GL11.glTranslatef(0.0f, -0.5f, -0.0f);
@@ -412,13 +421,9 @@ public class CS2150Coursework extends GraphicsLab
 					//My transformation to fire it from the end of the barrel 
 					GL11.glTranslatef(0.0f, 0.0f, 0.35f);
 
-
-
-					//GL11.glTranslatef(0.0f, 0.0f, 0.4f);
+					//Draw bullet body
 					GL11.glPushMatrix();
 					{
-						//GL11.glRotatef(180, 0.0f, 1.0f, 0.0f);
-
 						/*
 						 * Pasted method params here because they're not shown by eclipse for this
 						 * draw(float baseRadius, float topRadius, float height, int slices, int stacks)
@@ -433,8 +438,6 @@ public class CS2150Coursework extends GraphicsLab
 						GL11.glTranslatef(0.0f, 0.0f, 0.15f);
 						GL11.glPushMatrix();
 						{
-							//GL11.glRotatef(180, 0.0f, 1.0f, 0.0f);
-
 							/*
 							 * Pasted method params here because they're not shown by eclipse for this
 							 * draw(float baseRadius, float topRadius, float height, int slices, int stacks)
@@ -455,9 +458,8 @@ public class CS2150Coursework extends GraphicsLab
 						GL11.glTranslatef(0.0f, 0.0f, 0.0f);
 						GL11.glPushMatrix();
 						{
-							Colour.RED.submit();
 							GL11.glRotatef(180, 0.0f, 1.0f, 0.0f);
-							/*]
+							/*
 							 * Pasted method params here because they're not shown by eclipse for this
 							 * draw(float baseRadius, float topRadius, float height, int slices, int stacks)
 							 */
@@ -479,9 +481,20 @@ public class CS2150Coursework extends GraphicsLab
 		GL11.glPopMatrix();
 
 
-
-
-
+		/*
+		 * Create shape above floor so bullets are correctly aligned with mouse
+		 */
+		GL11.glPushMatrix();
+		{
+			GL11.glTranslatef(0.0f, -1.0f, 0.0f);
+			GL11.glScalef(10, 1, 10);
+			// enable texturing and bind an appropriate texture
+			GL11.glEnable(GL11.GL_TEXTURE_2D);
+			GL11.glBindTexture(GL11.GL_TEXTURE_2D, plainWhiteTexture.getTextureID());
+			drawInvisibleUnitPlane();
+			GL11.glDisable(GL11.GL_TEXTURE_2D);
+		}
+		GL11.glPopMatrix();
 
 
 		/*******************
@@ -511,22 +524,70 @@ public class CS2150Coursework extends GraphicsLab
 		java.nio.IntBuffer viewport = BufferUtils.createIntBuffer(16);
 		// Get current model view matrix:
 		GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
-		
+
 
 		GLU.gluUnProject((float) mouseX, (float) mouseY, z.get(0), modelviewMatrix, projectionMatrix, viewport, mouseWorldPos);
 
-		GL11.glPushMatrix();
+		/*GL11.glPushMatrix();
 		{
 			GL11.glTranslatef(mouseWorldPos.get(0), mouseWorldPos.get(1), mouseWorldPos.get(2));
 			GL11.glScalef(0.5f, 0.5f, 0.5f);
 			GL11.glTranslatef(0.0f, 0.5f, 0.0f);
-			
+
 			drawUnitCube();
 		}
-		GL11.glPopMatrix();
-		
-		//                                                                               atan2(a.y-o.y, a.x-o.x) - atan2(b.y-o.y, b.x-o.x)
+		GL11.glPopMatrix();*/
+
+		//                               atan2(a.y-o.y, a.x-o.x) - atan2(b.y-o.y, b.x-o.x)
 		turretRotation = (float) Math.toDegrees(Math.atan2(1, 0) - Math.atan2(mouseWorldPos.get(2) - tankPosition.z, mouseWorldPos.get(0) - tankPosition.x)) - 90;
+
+
+
+
+
+
+
+
+		GL11.glMatrixMode(GL11.GL_PROJECTION);
+		GL11.glPushMatrix();
+		{
+			GL11.glLoadIdentity();
+			GL11.glOrtho(0.0, 800, 600, 0.0, -1.0, 10.0);
+			GL11.glMatrixMode(GL11.GL_MODELVIEW);
+			GL11.glPushMatrix();
+			{
+				GL11.glLoadIdentity();
+				GL11.glDisable(GL11.GL_CULL_FACE);
+
+				GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+
+				GL11.glBegin(GL11.GL_QUADS);
+				{
+					/*try {
+						org.lwjgl.input.Cursor emptyCursor = new org.lwjgl.input.Cursor(1, 1, 0, 0, 1, BufferUtils.createIntBuffer(1), null);
+						Mouse.setNativeCursor(emptyCursor);
+					} catch (LWJGLException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}*/
+					float fixedMouseY = 600 - Mouse.getY();
+
+					//GL11.glColor3f(1.0f, 0.0f, 0.0f);
+					GL11.glVertex2f(Mouse.getX() - 5, fixedMouseY - 5);
+					GL11.glVertex2f(Mouse.getX() + 5, fixedMouseY - 5);
+					GL11.glVertex2f(Mouse.getX() + 5, fixedMouseY + 5);
+					GL11.glVertex2f(Mouse.getX() - 5, fixedMouseY + 5);
+				}
+				GL11.glEnd();
+
+				// Making sure we can render 3d again
+				GL11.glMatrixMode(GL11.GL_PROJECTION);
+			}
+			GL11.glPopMatrix();
+			GL11.glMatrixMode(GL11.GL_MODELVIEW);
+		}
+		GL11.glPopMatrix();
+
 	}
 
 	protected void setSceneCamera()
@@ -912,7 +973,7 @@ public class CS2150Coursework extends GraphicsLab
 	 * @param radius the radius of the circle
 	 * @param slices the number of points the circle will be drawn from. Larger = smoother
 	 */
-	protected void drawCircle(float radius, int slices){
+	private void drawCircle(float radius, int slices){
 		float doublePi = (float) (Math.PI * 2);
 		GL11.glBegin(GL11.GL_TRIANGLE_FAN);
 		{
@@ -923,6 +984,39 @@ public class CS2150Coursework extends GraphicsLab
 			}
 		}
 		GL11.glEnd();
+	}
+
+	private void drawInvisibleUnitPlane(){
+		//The vertices for the invisible plane
+		Vertex v1 = new Vertex(-0.5f, 0.0f,  -0.5f);
+		Vertex v2 = new Vertex(0.5f,  0.0f,  -0.5f);
+		Vertex v3 = new Vertex(0.5f,  0.0f,  0.5f);
+		Vertex v4 = new Vertex(-0.5f, 0.0f,  0.5f);
+
+		GL11.glEnable(GL11.GL_BLEND); //Enable blending.
+		GL11.glBlendFunc(GL11.GL_ONE, GL11.GL_SRC_ALPHA); //Set blending function.
+		GL11.glColor4f(0.5f, 0.5f, 0.5f, 0.0f);
+		
+		//Draw face bottom
+		GL11.glBegin(GL11.GL_POLYGON);
+		{
+			new Normal(v4.toVector(), v3.toVector(), v2.toVector()).submit();
+			
+			GL11.glTexCoord2f(0.0f, 0.0f);
+			v4.submit();
+			
+			GL11.glTexCoord2f(1.0f, 0.0f);
+			v3.submit();
+			
+			GL11.glTexCoord2f(1.0f, 1.0f);
+			v2.submit();
+			
+			GL11.glTexCoord2f(0.0f, 1.0f);
+			v1.submit();
+		}
+		GL11.glEnd();
+		
+		GL11.glDisable(GL11.GL_BLEND);
 	}
 
 }

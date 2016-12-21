@@ -2,7 +2,7 @@ package coursework.woollena;
 
 public class BulletData {
 	
-	private static final float speed = 0.17f;
+	private static final float speed = 0.175f;
 	
 	private float tankPosX;
 	private float tankPosY;
