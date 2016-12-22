@@ -6,56 +6,21 @@
  * Scene Graph:
  * 	Scene origin
  *  |
- *  +-- [T(0, 0, 1)] Ground (Cube)
- *  |   |
- *  |   +-- [T(0, 0, 0.2)] Tank body (custom shape)
- *  |   |   |
- *  |   |   +-- [T()] Tank turret (custom shape)
- *  |   |       |
- *  |   |       +-- [] Tank barrel (cylinder)
- *  |   |           |
- *  |   |           +-- [] Tank cap (circle)
- *  |   |
- *  |   +-- [] Any bullet bodies (cylinder)
- *  |   |   |
- *  |   |   +-- [] Any bullet caps (cone from cylinder)
- *  |   |   |
- *  |   |   +-- [] Any bullet backs (circle)
- *  
- *  
- *  
- *  |   |       |
- *  |   |       +-- [] Left upper arm (Cube)
- *  |   |       |   |
- *  |   |       |   +-- [] Left lower arm (Cube)
- *  |   |       |
- *  |   |       +-- [] Right upper arm (Cube)
- *  |   |       |   |
- *  |   |       |   +-- [] Right lower arm (Cube)
- *  |   |       |
- *  |   |       +-- [] Head (Cube)
- *  |   |       |
- *  |   |       +-- [Ry(90)] Mini-gun mount (Cylinder)
- *  |   |           |
- *  |   |           +-- [] Mini-gun (Cylinder)
- *  |   |
- *  |   +-- [] Left leg upper (Cube)
- *  |   |   |
- *  |   |   +-- [] Left leg mid (Cube)
- *  |   |       |
- *  |   |       +-- [] Left leg lower (Cube)
- *  |   |           |
- *  |   |           +-- [] Left foot (Cube)
- *  |   |
- *  |   +-- [] Right leg upper (Cube)
- *  |   |   |
- *  |   |   +-- [] Right leg mid (Cube)
- *  |   |       |
- *  |   |       +-- [] Right leg lower (Cube)
- *  |   |           |
- *  |   |           +-- [] Right foot (Cube)
- *  |
- *  
+ *  +-- [T(0, -7.8, -7) T(0, -0.5, 0) S(10, 1, 10)] Ground (Cube)
+ *      |
+ *      +-- [T(tankPosX, tankPosY, tankPosZ)] Tank body (custom shape)
+ *      |   |
+ *      |   +-- [Ry(turretRotation) T(0, 0.381, 0)] Tank turret (custom shape)
+ *      |       |
+ *      |       +-- [Ry(90) T(0.0, 0.095, 0.135)] Tank turret barrel (cylinder)
+ *      |           |
+ *      |           +-- [T(0.0, 0.0, 0.4)] Tank turret barrel cap (circle)
+ *      |
+ *      +-- [T(bulletPosX, bulletPosY, bulletPosZ) Ry(90) T(0.0, 0.381, 0.0) T(0.0, 0.095, 0.135)] Any bullet bodies (cylinder)
+ *          |
+ *          +-- [T(0.0, 0.0, 0.15)] Any bullet caps (cone from cylinder)
+ *          |
+ *          +-- [Ry(180)] Any bullet backs (circle)
  *
  */
 package coursework.woollena;
@@ -63,30 +28,27 @@ package coursework.woollena;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.Cylinder;
 import org.lwjgl.util.glu.GLU;
-import org.lwjgl.util.vector.Matrix;
 import org.lwjgl.util.vector.Vector3f;
 
 import java.util.Iterator;
 import java.util.LinkedList;
-
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.newdawn.slick.opengl.Texture;
 import GraphicsLab.*;
-import javafx.scene.Cursor;
-import javafx.scene.paint.Color;
 
 /**
  * <p>This project is a tank game, where the player must use their skills to destroy all enemy tanks.</p>
+ * <p>Unfortunately, only the player's tank has been implemented, and there is no bullet collision detection.</p>
  * <p>The player may move the tank, aim the turret, and fire.</p>
  * 
  * <p>Game controls:
  * <ul>
  * <li>WASD to move the tank</li>
- * <li>Left and right arrow keys to rotate the turret</li>
- * <li>Space to fire!</li>
+ * <li>Aim the turret with the mouse</li>
+ * <li>Space or mouse left click to fire!</li>
  * </ul>
  * </p>
  * <p>Development controls:
@@ -97,8 +59,9 @@ import javafx.scene.paint.Color;
  *      to increase or decrease the viewpoint's distance from the scene origin
  * </ul>
  * </p>
- * TODO: Add any additional controls for your sample to the list above
- *
+ * 
+ * @author Adam Woollen
+ * @version 1.0
  */
 public class CS2150Coursework extends GraphicsLab
 {
@@ -136,7 +99,16 @@ public class CS2150Coursework extends GraphicsLab
 	/** 
 	 * ids for nearest, linear and mipmapped textures for the transparent plane
 	 */
-	private Texture plainWhiteTexture;
+	private Texture transparencyBlackTexture;
+	/** 
+	 * ids for nearest, linear and mipmapped textures for the tank turret
+	 * <p>Sources:
+	 * <ul>
+	 * <li>Damage effect (applied to blue colour) - https://www.youtube.com/watch?v=LK5mXWKj5Ks</li>
+	 * </ul>
+	 * </p>
+	 */
+	private Texture tankTurretTexture;
 
 	//Animation variables
 	private Vector3f tankPosition;
@@ -173,14 +145,25 @@ public class CS2150Coursework extends GraphicsLab
 		mouseWorldPos.put(2, 0.0f);
 
 		moveLevelX = 0.0f;
-		moveLevelY = -7.0f;
+		moveLevelY = -7.8f;
 		moveLevelZ = -7.0f;
 
 		//Load the textures
-		testTexture = loadTexture("coursework/woollena/textures/test.bmp");
-		tankMainTexture = loadTexture("coursework/woollena/textures/tankTextureMain.bmp");
-		woodFloorTexture = loadTexture("coursework/woollena/textures/woodFloor.bmp");
-		plainWhiteTexture = loadTexture("coursework/woollena/textures/plainWhite.bmp");
+		//Paths change depending on whether you run in eclipse or command line
+		try{
+			testTexture = loadTexture("coursework/woollena/textures/test.bmp");
+			tankMainTexture = loadTexture("coursework/woollena/textures/tankTextureMain.bmp");
+			woodFloorTexture = loadTexture("coursework/woollena/textures/woodFloor.bmp");
+			transparencyBlackTexture = loadTexture("coursework/woollena/textures/transparencyBlack.bmp");
+			tankTurretTexture = loadTexture("coursework/woollena/textures/tankTurret.bmp");
+		} catch(Exception e){
+			testTexture = loadTexture("textures/test.bmp");
+			tankMainTexture = loadTexture("textures/tankTextureMain.bmp");
+			woodFloorTexture = loadTexture("textures/woodFloor.bmp");
+			transparencyBlackTexture = loadTexture("textures/transparencyBlack.bmp");
+			tankTurretTexture = loadTexture("textures/tankTurret.bmp");
+		}
+
 
 		// Global ambient light level
 		float globalAmbient[] = {1f,  1f,  1f, 1.0f};
@@ -225,12 +208,12 @@ public class CS2150Coursework extends GraphicsLab
 
 
 		/*
-		 * To disable the windows cursor, I used the follwing answer
+		 * To disable the windows cursor, I used the following answer
 		 * http://forum.lwjgl.org/index.php?topic=594.msg23476#msg23476
 		 * I did read official documentation however, it did not work
 		 * I tried this 'hack' and it did, so I used it.
 		 */
-		
+
 		try {
 			org.lwjgl.input.Cursor emptyCursor = new org.lwjgl.input.Cursor(1, 1, 0, 0, 1, BufferUtils.createIntBuffer(1), null);
 			Mouse.setNativeCursor(emptyCursor);
@@ -243,15 +226,6 @@ public class CS2150Coursework extends GraphicsLab
 	protected void checkSceneInput()
 	{
 		//TODO: Check for keyboard and mouse input here
-
-		//No longer needed because turret now follows mouse
-		/*if(Keyboard.isKeyDown(Keyboard.KEY_RIGHT)){
-			turretRotation = (turretRotation - (5.0f * getAnimationScale())) % 360;
-		}
-
-		if(Keyboard.isKeyDown(Keyboard.KEY_LEFT)){
-			turretRotation = (turretRotation + (5.0f * getAnimationScale())) % 360;
-		}*/
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_A)){
 			tankPosition.translate(-0.13f * getAnimationScale(), 0, 0);
@@ -295,7 +269,7 @@ public class CS2150Coursework extends GraphicsLab
 		//TODO: Render your scene here - remember that a scene graph will help you write this method! 
 		//      It will probably call a number of other methods you will write.
 
-		//Print frames per second
+		//Print frames per second to console
 		double currentTime = System.currentTimeMillis();
 		frames++;
 		if (currentTime - lastTime >= updateMillis){
@@ -311,8 +285,6 @@ public class CS2150Coursework extends GraphicsLab
 		//Draw ground
 		GL11.glPushMatrix();
 		{
-
-			GL11.glTranslatef(0.0f, -1.5f, 0.0f);
 			GL11.glPushMatrix();
 			{
 				GL11.glTranslatef(0.0f, -0.5f, -0.0f);
@@ -328,85 +300,13 @@ public class CS2150Coursework extends GraphicsLab
 			}
 			GL11.glPopMatrix();
 
-			//Draw tank body
-			GL11.glPushMatrix();
-			{
-				GL11.glTranslatef(tankPosition.x, tankPosition.y, tankPosition.z);
-				GL11.glPushMatrix();
-				{
-					// enable texturing and bind an appropriate texture
-					GL11.glEnable(GL11.GL_TEXTURE_2D);
-					GL11.glBindTexture(GL11.GL_TEXTURE_2D, tankMainTexture.getTextureID());
 
-					GL11.glCallList(LIST_TANK_BODY);//Tank body
+			/**
+			 * Render tank here!
+			 * Moved to own method to tidy up code, and then I can reuse it to also make enemy tanks
+			 */
 
-					GL11.glDisable(GL11.GL_TEXTURE_2D);
-				}
-				GL11.glPopMatrix();
-
-				//Draw tank turret
-				GL11.glPushMatrix();
-				{
-					GL11.glRotatef(turretRotation, 0.0f, 1.0f, 0.0f);
-					GL11.glTranslatef(0.0f, 0.381f, 0.0f);
-					GL11.glPushMatrix();
-					{
-						GL11.glCallList(LIST_TANK_TURRET);//Tank turret
-					}
-					GL11.glPopMatrix();
-
-					//Draw tank turret barrel
-					GL11.glPushMatrix();
-					{
-						GL11.glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
-						/*
-						 *  y = turret height / 2
-						 *  y = 0.19 / 2
-						 *  y = 0.095
-						 */
-						GL11.glTranslatef(0.0f, 0.095f, 0.135f);
-						GL11.glPushMatrix();
-						{
-							/*
-							 * Pasted method params here because they're not shown by eclipse for this
-							 * draw(float baseRadius, float topRadius, float height, int slices, int stacks)
-							 */
-							new Cylinder().draw(0.05f, 0.05f, 0.4f, 10, 1);//Tank turret barrel
-						}
-						GL11.glPopMatrix();
-
-
-
-						if(makeBullet){
-							BulletData newBullet = new BulletData(getAnimationScale(), tankPosition.x, tankPosition.y, tankPosition.z, turretRotation);
-							bullets.add(newBullet);
-							makeBullet = false;
-						}
-
-
-
-
-						//Draw tank turret barrel cap
-						GL11.glPushMatrix();
-						{
-							GL11.glTranslatef(0.0f, 0.0f, 0.4f);
-							GL11.glPushMatrix();
-							{
-								//GL11.glRotatef(180, 0.0f, 1.0f, 0.0f);
-								drawCircle(0.05f, 10);//Tank turret barrel cap
-							}
-							GL11.glPopMatrix();
-
-							//Draw next thing
-
-						}
-						GL11.glPopMatrix();
-					}
-					GL11.glPopMatrix();
-				}
-				GL11.glPopMatrix();
-			}
-			GL11.glPopMatrix();
+			drawTank();
 
 
 			/*
@@ -468,14 +368,9 @@ public class CS2150Coursework extends GraphicsLab
 					//Draw bullet back
 					GL11.glPushMatrix();
 					{
-						GL11.glTranslatef(0.0f, 0.0f, 0.0f);
 						GL11.glPushMatrix();
 						{
 							GL11.glRotatef(180, 0.0f, 1.0f, 0.0f);
-							/*
-							 * Pasted method params here because they're not shown by eclipse for this
-							 * draw(float baseRadius, float topRadius, float height, int slices, int stacks)
-							 */
 							drawCircle(0.03f, 10);//Bullet tip
 						}
 						GL11.glPopMatrix();
@@ -493,17 +388,22 @@ public class CS2150Coursework extends GraphicsLab
 		}
 		GL11.glPopMatrix();
 
-
 		/*
 		 * Create shape above floor so bullets are correctly aligned with mouse
+		 * 
+		 * Here I create an invisible plane at the same height as the bullets.
+		 * This makes it so that the bullets and mouse are properly aligned and
+		 * aiming is accurate
+		 * Without this, the mouse is below the bullet and at most angles the bullet
+		 * will not accurately pass through the mouse
 		 */
 		GL11.glPushMatrix();
 		{
-			GL11.glTranslatef(0.0f, -1.0f, 0.0f);
-			GL11.glScalef(10, 1, 10);
+			GL11.glTranslatef(0.0f, 0.5f, 0.0f);
+			GL11.glScalef(15, 1, 15);
 			// enable texturing and bind an appropriate texture
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
-			GL11.glBindTexture(GL11.GL_TEXTURE_2D, plainWhiteTexture.getTextureID());
+			GL11.glBindTexture(GL11.GL_TEXTURE_2D, transparencyBlackTexture.getTextureID());
 			drawInvisibleUnitPlane();
 			GL11.glDisable(GL11.GL_TEXTURE_2D);
 		}
@@ -546,17 +446,7 @@ public class CS2150Coursework extends GraphicsLab
 
 		GLU.gluUnProject((float) mouseX, (float) mouseY, z.get(0), modelviewMatrix, projectionMatrix, viewport, mouseWorldPos);
 
-		/*GL11.glPushMatrix();
-		{
-			GL11.glTranslatef(mouseWorldPos.get(0), mouseWorldPos.get(1), mouseWorldPos.get(2));
-			GL11.glScalef(0.5f, 0.5f, 0.5f);
-			GL11.glTranslatef(0.0f, 0.5f, 0.0f);
 
-			drawUnitCube();
-		}
-		GL11.glPopMatrix();*/
-
-		
 		/*
 		 * I used the following answer to work out the mathematics for turret rotation
 		 * http://stackoverflow.com/a/23408996
@@ -566,12 +456,7 @@ public class CS2150Coursework extends GraphicsLab
 		 * the origin is the tank, making the result just 1 (tank + 1 - tank)
 		 * The same works for 0, too
 		 */
-		
 		turretRotation = (float) Math.toDegrees(Math.atan2(1, 0) - Math.atan2(mouseWorldPos.get(2) - tankPosition.z, mouseWorldPos.get(0) - tankPosition.x)) - 90;
-
-
-
-
 
 
 		/*
@@ -581,31 +466,50 @@ public class CS2150Coursework extends GraphicsLab
 		 * It works by changing the projection to parallel, drawing a 2D object, and
 		 * then switching back to 3D so we can render the game as usual
 		 */
-
 		GL11.glMatrixMode(GL11.GL_PROJECTION);
 		GL11.glPushMatrix();
 		{
 			GL11.glLoadIdentity();
-			GL11.glOrtho(0.0, 800, 600, 0.0, -1.0, 10.0);
+			GL11.glOrtho(0.0, 800, 600, 0.0, -1.0, 10.0);//Changes to parallel projection
 			GL11.glMatrixMode(GL11.GL_MODELVIEW);
 			GL11.glPushMatrix();
 			{
 				GL11.glLoadIdentity();
 				GL11.glDisable(GL11.GL_CULL_FACE);
 
-				GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+				float fixedMouseY = 600 - Mouse.getY();
+
 
 				GL11.glBegin(GL11.GL_QUADS);
 				{
-					float fixedMouseY = 600 - Mouse.getY();
+					//Neither of these appear to work
+					//Colour.RED.submit();
+					//GL11.glColor3f(1.0f, 0.0f, 0.0f);
 
-					GL11.glVertex2f(Mouse.getX() - 5, fixedMouseY - 5);
-					GL11.glVertex2f(Mouse.getX() + 5, fixedMouseY - 5);
-					GL11.glVertex2f(Mouse.getX() + 5, fixedMouseY + 5);
-					GL11.glVertex2f(Mouse.getX() - 5, fixedMouseY + 5);
+
+					//Coordinates from top-left
+					GL11.glVertex2f(Mouse.getX() - 2, fixedMouseY - 30);
+					GL11.glVertex2f(Mouse.getX() + 2, fixedMouseY - 30);
+					GL11.glVertex2f(Mouse.getX() + 2, fixedMouseY - 10);
+					GL11.glVertex2f(Mouse.getX() - 2, fixedMouseY - 10);
+
+					GL11.glVertex2f(Mouse.getX() + 10, fixedMouseY - 2);
+					GL11.glVertex2f(Mouse.getX() + 30, fixedMouseY - 2);
+					GL11.glVertex2f(Mouse.getX() + 30, fixedMouseY + 2);
+					GL11.glVertex2f(Mouse.getX() + 10, fixedMouseY + 2);
+					
+					GL11.glVertex2f(Mouse.getX() - 2, fixedMouseY + 10);
+					GL11.glVertex2f(Mouse.getX() + 2, fixedMouseY + 10);
+					GL11.glVertex2f(Mouse.getX() + 2, fixedMouseY + 30);
+					GL11.glVertex2f(Mouse.getX() - 2, fixedMouseY + 30);
+					
+					GL11.glVertex2f(Mouse.getX() - 30, fixedMouseY - 2);
+					GL11.glVertex2f(Mouse.getX() - 10, fixedMouseY - 2);
+					GL11.glVertex2f(Mouse.getX() - 10, fixedMouseY + 2);
+					GL11.glVertex2f(Mouse.getX() - 30, fixedMouseY + 2);
 				}
 				GL11.glEnd();
-
+				
 				// Making sure we can render 3d again
 				GL11.glMatrixMode(GL11.GL_PROJECTION);
 			}
@@ -647,6 +551,94 @@ public class CS2150Coursework extends GraphicsLab
 		GL11.glMaterialf(GL11.GL_FRONT, GL11.GL_SHININESS, shininess);
 		GL11.glMaterial(GL11.GL_FRONT, GL11.GL_SPECULAR, FloatBuffer.wrap(specular));
 		GL11.glMaterial(GL11.GL_FRONT, GL11.GL_DIFFUSE, FloatBuffer.wrap(diffuse));
+	}
+
+	private void drawTank(){
+		//Draw tank body
+		GL11.glPushMatrix();
+		{
+			GL11.glTranslatef(tankPosition.x, tankPosition.y, tankPosition.z);
+			GL11.glPushMatrix();
+			{
+				// enable texturing and bind an appropriate texture
+				GL11.glEnable(GL11.GL_TEXTURE_2D);
+				GL11.glBindTexture(GL11.GL_TEXTURE_2D, tankMainTexture.getTextureID());
+
+				GL11.glCallList(LIST_TANK_BODY);//Tank body
+
+				GL11.glDisable(GL11.GL_TEXTURE_2D);
+			}
+			GL11.glPopMatrix();
+
+			//Draw tank turret
+			GL11.glPushMatrix();
+			{
+				//This texture binding will be applied to turret, barrel, and cap
+				// enable texturing and bind an appropriate texture
+				GL11.glEnable(GL11.GL_TEXTURE_2D);
+				GL11.glBindTexture(GL11.GL_TEXTURE_2D, tankTurretTexture.getTextureID());
+				
+				GL11.glRotatef(turretRotation, 0.0f, 1.0f, 0.0f);
+				GL11.glTranslatef(0.0f, 0.381f, 0.0f);
+				GL11.glPushMatrix();
+				{
+					
+					GL11.glCallList(LIST_TANK_TURRET);//Tank turret
+				}
+				GL11.glPopMatrix();
+
+				//Draw tank turret barrel
+				GL11.glPushMatrix();
+				{
+					GL11.glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
+					/*
+					 *  y = turret height / 2
+					 *  y = 0.19 / 2
+					 *  y = 0.095
+					 */
+					GL11.glTranslatef(0.0f, 0.095f, 0.135f);
+					GL11.glPushMatrix();
+					{
+						/*
+						 * Pasted method params here because they're not shown by eclipse for this
+						 * draw(float baseRadius, float topRadius, float height, int slices, int stacks)
+						 */
+						new Cylinder().draw(0.05f, 0.05f, 0.4f, 10, 1);//Tank turret barrel
+					}
+					GL11.glPopMatrix();
+
+
+					if(makeBullet){
+						BulletData newBullet = new BulletData(getAnimationScale(), tankPosition.x, tankPosition.y, tankPosition.z, turretRotation);
+						bullets.add(newBullet);
+						makeBullet = false;
+					}
+
+
+					//Draw tank turret barrel cap
+					GL11.glPushMatrix();
+					{
+						GL11.glTranslatef(0.0f, 0.0f, 0.4f);
+						GL11.glPushMatrix();
+						{
+							//GL11.glRotatef(180, 0.0f, 1.0f, 0.0f);
+							drawCircle(0.05f, 10);//Tank turret barrel cap
+						}
+						GL11.glPopMatrix();
+
+						//Draw next thing
+
+					}
+					GL11.glPopMatrix();
+					
+					
+					GL11.glDisable(GL11.GL_TEXTURE_2D);
+				}
+				GL11.glPopMatrix();
+			}
+			GL11.glPopMatrix();
+		}
+		GL11.glPopMatrix();
 	}
 
 	/**
@@ -926,9 +918,16 @@ public class CS2150Coursework extends GraphicsLab
 		{
 			new Normal(v1.toVector(), v4.toVector(), v3.toVector()).submit();
 
+			GL11.glTexCoord2f(0.35f, 0.65f);
 			v1.submit();
+			
+			GL11.glTexCoord2f(0.0f, 1.0f);
 			v4.submit();
+			
+			GL11.glTexCoord2f(0.0f, 0.0f);
 			v3.submit();
+			
+			GL11.glTexCoord2f(0.35f, 0.35f);
 			v2.submit();
 		}
 		GL11.glEnd();
@@ -938,9 +937,16 @@ public class CS2150Coursework extends GraphicsLab
 		{
 			new Normal(v5.toVector(), v6.toVector(), v7.toVector()).submit();
 
+			GL11.glTexCoord2f(0.65f, 0.65f);
 			v5.submit();
+			
+			GL11.glTexCoord2f(0.65f, 0.35f);
 			v6.submit();
+			
+			GL11.glTexCoord2f(1.0f, 0.0f);
 			v7.submit();
+			
+			GL11.glTexCoord2f(1.0f, 1.0f);
 			v8.submit();
 		}
 		GL11.glEnd();
@@ -950,9 +956,16 @@ public class CS2150Coursework extends GraphicsLab
 		{
 			new Normal(v1.toVector(), v5.toVector(), v8.toVector()).submit();
 
+			GL11.glTexCoord2f(0.35f, 0.65f);
 			v1.submit();
+			
+			GL11.glTexCoord2f(0.65f, 0.65f);
 			v5.submit();
+			
+			GL11.glTexCoord2f(1.0f, 1.0f);
 			v8.submit();
+			
+			GL11.glTexCoord2f(0.0f, 1.0f);
 			v4.submit();
 		}
 		GL11.glEnd();
@@ -962,9 +975,16 @@ public class CS2150Coursework extends GraphicsLab
 		{
 			new Normal(v2.toVector(), v3.toVector(), v7.toVector()).submit();
 
+			GL11.glTexCoord2f(0.35f, 0.35f);
 			v2.submit();
+			
+			GL11.glTexCoord2f(0.0f, 0.0f);
 			v3.submit();
+			
+			GL11.glTexCoord2f(1.0f, 0.0f);
 			v7.submit();
+			
+			GL11.glTexCoord2f(0.65f, 0.35f);
 			v6.submit();
 		}
 		GL11.glEnd();
@@ -974,9 +994,16 @@ public class CS2150Coursework extends GraphicsLab
 		{
 			new Normal(v1.toVector(), v2.toVector(), v6.toVector()).submit();
 
+			GL11.glTexCoord2f(0.35f, 0.65f);
 			v1.submit();
+			
+			GL11.glTexCoord2f(0.35f, 0.35f);
 			v2.submit();
+			
+			GL11.glTexCoord2f(0.65f, 0.35f);
 			v6.submit();
+			
+			GL11.glTexCoord2f(0.65f, 0.65f);
 			v5.submit();
 		}
 		GL11.glEnd();
@@ -1022,26 +1049,26 @@ public class CS2150Coursework extends GraphicsLab
 		GL11.glEnable(GL11.GL_BLEND); //Enable blending.
 		GL11.glBlendFunc(GL11.GL_ONE, GL11.GL_SRC_ALPHA); //Set blending function.
 		GL11.glColor4f(0.5f, 0.5f, 0.5f, 0.0f);
-		
+
 		//Draw face bottom
 		GL11.glBegin(GL11.GL_POLYGON);
 		{
 			new Normal(v4.toVector(), v3.toVector(), v2.toVector()).submit();
-			
+
 			GL11.glTexCoord2f(0.0f, 0.0f);
 			v4.submit();
-			
+
 			GL11.glTexCoord2f(1.0f, 0.0f);
 			v3.submit();
-			
+
 			GL11.glTexCoord2f(1.0f, 1.0f);
 			v2.submit();
-			
+
 			GL11.glTexCoord2f(0.0f, 1.0f);
 			v1.submit();
 		}
 		GL11.glEnd();
-		
+
 		GL11.glDisable(GL11.GL_BLEND);
 	}
 
