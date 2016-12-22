@@ -224,7 +224,12 @@ public class CS2150Coursework extends GraphicsLab
 
 
 
-		//GL11.glEnable(GL11.GL_DEPTH_TEST);
+		/*
+		 * To disable the windows cursor, I used the follwing answer
+		 * http://forum.lwjgl.org/index.php?topic=594.msg23476#msg23476
+		 * I did read official documentation however, it did not work
+		 * I tried this 'hack' and it did, so I used it.
+		 */
 		
 		try {
 			org.lwjgl.input.Cursor emptyCursor = new org.lwjgl.input.Cursor(1, 1, 0, 0, 1, BufferUtils.createIntBuffer(1), null);
@@ -509,6 +514,11 @@ public class CS2150Coursework extends GraphicsLab
 		 * Mouse tracking! *
 		 *******************/
 
+		/*
+		 * I used the following answer in order to do the mouse tracking in 3D space
+		 * The answer has a great explanation of what all of the components are
+		 * http://gamedev.stackexchange.com/a/71489
+		 */
 
 		int mouseX = Mouse.getX();
 		int mouseY = Mouse.getY();
@@ -546,7 +556,17 @@ public class CS2150Coursework extends GraphicsLab
 		}
 		GL11.glPopMatrix();*/
 
-		//                               atan2(a.y-o.y, a.x-o.x) - atan2(b.y-o.y, b.x-o.x)
+		
+		/*
+		 * I used the following answer to work out the mathematics for turret rotation
+		 * http://stackoverflow.com/a/23408996
+		 * I modified it to make the tank the origin
+		 * atan2(a.y - o.y, a.x - o.x) - atan2(b.y - o.y, b.x - o.x)
+		 * The first atan2 has 1, 0 because position a is just to the right of the tank (+1) and
+		 * the origin is the tank, making the result just 1 (tank + 1 - tank)
+		 * The same works for 0, too
+		 */
+		
 		turretRotation = (float) Math.toDegrees(Math.atan2(1, 0) - Math.atan2(mouseWorldPos.get(2) - tankPosition.z, mouseWorldPos.get(0) - tankPosition.x)) - 90;
 
 
@@ -554,7 +574,13 @@ public class CS2150Coursework extends GraphicsLab
 
 
 
-
+		/*
+		 * I used the following answer for making the 2D cursor but, modified it to
+		 * remove unneeded bits and draw my own cursor
+		 * http://stackoverflow.com/a/5468894
+		 * It works by changing the projection to parallel, drawing a 2D object, and
+		 * then switching back to 3D so we can render the game as usual
+		 */
 
 		GL11.glMatrixMode(GL11.GL_PROJECTION);
 		GL11.glPushMatrix();
