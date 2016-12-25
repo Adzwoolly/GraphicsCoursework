@@ -26,18 +26,17 @@
 package coursework.woollena;
 
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.util.glu.Cylinder;
 import org.lwjgl.util.glu.GLU;
 import org.lwjgl.util.vector.Vector3f;
 
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.newdawn.slick.opengl.Texture;
 import GraphicsLab.*;
+import sun.security.krb5.internal.LastReq;
 
 /**
  * <p>This project is a tank game, where the player must use their skills to destroy all enemy tanks.</p>
@@ -71,9 +70,9 @@ public class CS2150Coursework extends GraphicsLab
 	int updateMillis = 500;
 
 	/** display list id for the tank body */
-	private final int LIST_TANK_BODY = 1;
+	public final static int LIST_TANK_BODY = 1;
 	/** display list id for the tank turret */
-	private final int LIST_TANK_TURRET = 2;
+	public final static int LIST_TANK_TURRET = 2;
 
 	/** ids for nearest, linear and mipmapped textures for testing */
 	private Texture testTexture;
@@ -111,9 +110,8 @@ public class CS2150Coursework extends GraphicsLab
 	private Texture tankTurretTexture;
 
 	//Animation variables
-	private Vector3f tankPosition;
-	private float turretRotation;
-	private LinkedList<BulletData> bullets;
+	private Tank playerTank;
+	private ArrayList<Tank> enemyTanks;
 	private boolean makeBullet;
 	private boolean lastBulletInputState;
 
@@ -121,6 +119,9 @@ public class CS2150Coursework extends GraphicsLab
 	float moveLevelX;
 	float moveLevelY;
 	float moveLevelZ;
+	
+	long lastFrameRenderTime;
+	static float dt;
 
 
 	//TODO: Feel free to change the window title and default animation scale here
@@ -133,9 +134,8 @@ public class CS2150Coursework extends GraphicsLab
 	{
 		//TODO: Initialise your resources here - might well call other methods you write.
 		//Set animation field values
-		tankPosition = new Vector3f(0.0f, 0.0f, -2.0f);
-		turretRotation = 0;
-		bullets = new LinkedList<BulletData>();
+		playerTank = new Tank(0.0f, 0.0f, -2.0f);
+		enemyTanks = new ArrayList<Tank>();
 		makeBullet = false;
 		lastBulletInputState = false;
 
@@ -147,6 +147,11 @@ public class CS2150Coursework extends GraphicsLab
 		moveLevelX = 0.0f;
 		moveLevelY = -7.8f;
 		moveLevelZ = -7.0f;
+		
+		lastFrameRenderTime = System.nanoTime();
+		dt = 0.0f;
+		
+		enemyTanks.add(new Tank(-2.0f, 0.0f, -2.0f));
 
 		//Load the textures
 		//Paths change depending on whether you run in eclipse or command line
@@ -228,19 +233,19 @@ public class CS2150Coursework extends GraphicsLab
 		//TODO: Check for keyboard and mouse input here
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_A)){
-			tankPosition.translate(-0.13f * getAnimationScale(), 0, 0);
+			playerTank.move(-0.5f * dt, 0);
 		}
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_D)){
-			tankPosition.translate(0.13f * getAnimationScale(), 0, 0);
+			playerTank.move(0.5f * dt, 0);
 		}
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_W)){
-			tankPosition.translate(0, 0, -0.13f * getAnimationScale());
+			playerTank.move(0, -0.5f * dt);
 		}
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_S)){
-			tankPosition.translate(0, 0, 0.13f * getAnimationScale());
+			playerTank.move(0, 0.5f * dt);
 		}
 
 		if(Keyboard.isKeyDown(Keyboard.KEY_SPACE) || Mouse.isButtonDown(0)){
@@ -257,11 +262,13 @@ public class CS2150Coursework extends GraphicsLab
 	protected void updateScene()
 	{
 		//TODO: Update your scene variables here - remember to use the current animation scale value
-		//        (obtained via a call to getAnimationScale()) in your modifications so that your animations
+		//        (obtained via a call to getAnimationScale() in your modifications so that your animations
 		//        can be made faster or slower depending on the machine you are working on
 
-
-
+		//Set the animation scale to the time to render the last frame in seconds
+		//This essentially makes it 'x per second' instead of 'x per frame'
+		dt = (System.nanoTime() - lastFrameRenderTime) / 100000000.0f;
+		lastFrameRenderTime = System.nanoTime();
 	}
 
 	protected void renderScene()
@@ -269,6 +276,7 @@ public class CS2150Coursework extends GraphicsLab
 		//TODO: Render your scene here - remember that a scene graph will help you write this method! 
 		//      It will probably call a number of other methods you will write.
 
+		
 		//Print frames per second to console
 		double currentTime = System.currentTimeMillis();
 		frames++;
@@ -303,85 +311,24 @@ public class CS2150Coursework extends GraphicsLab
 
 			/**
 			 * Render tank here!
-			 * Moved to own method to tidy up code, and then I can reuse it to also make enemy tanks
+			 * Moved to own class to tidy up code, and then I can reuse it to also make enemy tanks
 			 */
-
-			drawTank();
-
-
-			/*
-			 * for every bullet:
-			 *     get current position + rotation
-			 *     translate by amount to make travel
-			 */
-
-			Iterator<BulletData> it = bullets.iterator();
-			while (it.hasNext()) {
-				BulletData bullet = it.next();
-				if(System.currentTimeMillis() - bullet.getTimeCreated() > 4000){
-					it.remove();
+			playerTank.draw(tankMainTexture, tankTurretTexture, tankTurretTexture);
+			
+			for(Tank tank : enemyTanks){
+				tank.draw(tankMainTexture, tankTurretTexture, tankTurretTexture);
+				if(String.valueOf(System.currentTimeMillis()).contains("001")){
+					tank.fireBullet();
 				}
-
-				//Draw bullet
-				GL11.glPushMatrix();
-				{
-					//Transformations from the other shapes
-					GL11.glTranslatef(bullet.getNextPosX(), bullet.getNextPosY(), bullet.getNextPosZ());
-					GL11.glRotatef(bullet.getRotation(), 0.0f, 1.0f, 0.0f);
-					GL11.glRotatef(90, 0.0f, 1.0f, 0.0f);
-					GL11.glTranslatef(0.0f, 0.381f, 0.0f);
-					GL11.glTranslatef(0.0f, 0.095f, 0.135f);
-					//My transformation to fire it from the end of the barrel 
-					GL11.glTranslatef(0.0f, 0.0f, 0.35f);
-
-					//Draw bullet body
-					GL11.glPushMatrix();
-					{
-						/*
-						 * Pasted method params here because they're not shown by eclipse for this
-						 * draw(float baseRadius, float topRadius, float height, int slices, int stacks)
-						 */
-						new Cylinder().draw(0.03f, 0.03f, 0.15f, 10, 1);//Bullet body
-					}
-					GL11.glPopMatrix();
-
-					//Draw bullet tip
-					GL11.glPushMatrix();
-					{
-						GL11.glTranslatef(0.0f, 0.0f, 0.15f);
-						GL11.glPushMatrix();
-						{
-							/*
-							 * Pasted method params here because they're not shown by eclipse for this
-							 * draw(float baseRadius, float topRadius, float height, int slices, int stacks)
-							 */
-							new Cylinder().draw(0.03f, 0.0f, 0.05f, 10, 10);//Bullet tip
-						}
-						GL11.glPopMatrix();
-
-						//Draw next thing
-
-					}
-					GL11.glPopMatrix();
-
-
-					//Draw bullet back
-					GL11.glPushMatrix();
-					{
-						GL11.glPushMatrix();
-						{
-							GL11.glRotatef(180, 0.0f, 1.0f, 0.0f);
-							drawCircle(0.03f, 10);//Bullet tip
-						}
-						GL11.glPopMatrix();
-
-						//Draw next thing
-
-					}
-					GL11.glPopMatrix();
-				}
-				GL11.glPopMatrix();
 			}
+			
+			if(makeBullet){
+				playerTank.fireBullet();
+				makeBullet = false;
+			}
+
+
+			//Bullet code was here
 
 
 
@@ -456,7 +403,8 @@ public class CS2150Coursework extends GraphicsLab
 		 * the origin is the tank, making the result just 1 (tank + 1 - tank)
 		 * The same works for 0, too
 		 */
-		turretRotation = (float) Math.toDegrees(Math.atan2(1, 0) - Math.atan2(mouseWorldPos.get(2) - tankPosition.z, mouseWorldPos.get(0) - tankPosition.x)) - 90;
+		Vector3f tankPos = playerTank.getPosition();
+		playerTank.setTurretRotation((float) Math.toDegrees(Math.atan2(1, 0) - Math.atan2(mouseWorldPos.get(2) - tankPos.z, mouseWorldPos.get(0) - tankPos.x)) - 90);
 
 
 		/*
@@ -537,6 +485,10 @@ public class CS2150Coursework extends GraphicsLab
 	{
 		//TODO: Clean up your resources here
 	}
+	
+	public static float getDT(){
+		return dt;
+	}
 
 	private void setStandardMaterial()
 	{
@@ -553,93 +505,7 @@ public class CS2150Coursework extends GraphicsLab
 		GL11.glMaterial(GL11.GL_FRONT, GL11.GL_DIFFUSE, FloatBuffer.wrap(diffuse));
 	}
 
-	private void drawTank(){
-		//Draw tank body
-		GL11.glPushMatrix();
-		{
-			GL11.glTranslatef(tankPosition.x, tankPosition.y, tankPosition.z);
-			GL11.glPushMatrix();
-			{
-				// enable texturing and bind an appropriate texture
-				GL11.glEnable(GL11.GL_TEXTURE_2D);
-				GL11.glBindTexture(GL11.GL_TEXTURE_2D, tankMainTexture.getTextureID());
-
-				GL11.glCallList(LIST_TANK_BODY);//Tank body
-
-				GL11.glDisable(GL11.GL_TEXTURE_2D);
-			}
-			GL11.glPopMatrix();
-
-			//Draw tank turret
-			GL11.glPushMatrix();
-			{
-				//This texture binding will be applied to turret, barrel, and cap
-				// enable texturing and bind an appropriate texture
-				GL11.glEnable(GL11.GL_TEXTURE_2D);
-				GL11.glBindTexture(GL11.GL_TEXTURE_2D, tankTurretTexture.getTextureID());
-				
-				GL11.glRotatef(turretRotation, 0.0f, 1.0f, 0.0f);
-				GL11.glTranslatef(0.0f, 0.381f, 0.0f);
-				GL11.glPushMatrix();
-				{
-					
-					GL11.glCallList(LIST_TANK_TURRET);//Tank turret
-				}
-				GL11.glPopMatrix();
-
-				//Draw tank turret barrel
-				GL11.glPushMatrix();
-				{
-					GL11.glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
-					/*
-					 *  y = turret height / 2
-					 *  y = 0.19 / 2
-					 *  y = 0.095
-					 */
-					GL11.glTranslatef(0.0f, 0.095f, 0.135f);
-					GL11.glPushMatrix();
-					{
-						/*
-						 * Pasted method params here because they're not shown by eclipse for this
-						 * draw(float baseRadius, float topRadius, float height, int slices, int stacks)
-						 */
-						new Cylinder().draw(0.05f, 0.05f, 0.4f, 10, 1);//Tank turret barrel
-					}
-					GL11.glPopMatrix();
-
-
-					if(makeBullet){
-						BulletData newBullet = new BulletData(getAnimationScale(), tankPosition.x, tankPosition.y, tankPosition.z, turretRotation);
-						bullets.add(newBullet);
-						makeBullet = false;
-					}
-
-
-					//Draw tank turret barrel cap
-					GL11.glPushMatrix();
-					{
-						GL11.glTranslatef(0.0f, 0.0f, 0.4f);
-						GL11.glPushMatrix();
-						{
-							//GL11.glRotatef(180, 0.0f, 1.0f, 0.0f);
-							drawCircle(0.05f, 10);//Tank turret barrel cap
-						}
-						GL11.glPopMatrix();
-
-						//Draw next thing
-
-					}
-					GL11.glPopMatrix();
-					
-					
-					GL11.glDisable(GL11.GL_TEXTURE_2D);
-				}
-				GL11.glPopMatrix();
-			}
-			GL11.glPopMatrix();
-		}
-		GL11.glPopMatrix();
-	}
+	
 
 	/**
 	 * Draws a cube of unit length, width and height using the current OpenGL material settings
@@ -1026,7 +892,7 @@ public class CS2150Coursework extends GraphicsLab
 	 * @param radius the radius of the circle
 	 * @param slices the number of points the circle will be drawn from. Larger = smoother
 	 */
-	private void drawCircle(float radius, int slices){
+	protected static void drawCircle(float radius, int slices){
 		float doublePi = (float) (Math.PI * 2);
 		GL11.glBegin(GL11.GL_TRIANGLE_FAN);
 		{

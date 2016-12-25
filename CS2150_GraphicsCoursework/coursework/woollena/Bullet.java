@@ -1,6 +1,6 @@
 package coursework.woollena;
 
-public class BulletData {
+public class Bullet {
 	
 	private static final float speed = 0.175f;
 	
@@ -14,20 +14,20 @@ public class BulletData {
 	
 	private long timeCreated;
 	
-	public BulletData(float animationScale, float tankPosX, float tankPosY, float tankPosZ, float turretRotation){
+	public Bullet(float tankPosX, float tankPosY, float tankPosZ, float turretRotation){
 		this.tankPosX = tankPosX;
 		this.tankPosY = tankPosY;
 		this.tankPosZ = tankPosZ;
 		this.turretRotation = turretRotation;
 		
-		xComponent = (float) (speed * animationScale * Math.cos(Math.toRadians(0 - turretRotation)));
-		yComponent = (float) (speed * animationScale * Math.sin(Math.toRadians(0 - turretRotation)));
+		xComponent = (float) (speed * Math.cos(Math.toRadians(0 - turretRotation)));
+		yComponent = (float) (speed * Math.sin(Math.toRadians(0 - turretRotation)));
 		
 		timeCreated = System.currentTimeMillis();
 	}
 	
 	public float getNextPosX(){
-		tankPosX += xComponent;
+		tankPosX += (xComponent * CS2150Coursework.getDT());
 		return tankPosX;
 	}
 	
@@ -36,7 +36,7 @@ public class BulletData {
 	}
 	
 	public float getNextPosZ(){
-		tankPosZ += yComponent;
+		tankPosZ += (yComponent * CS2150Coursework.getDT());
 		return tankPosZ;
 	}
 	
