@@ -119,9 +119,13 @@ public class CS2150Coursework extends GraphicsLab
 	float moveLevelX;
 	float moveLevelY;
 	float moveLevelZ;
+	float levelWidth;
+	float levelHeight;
 	
 	long lastFrameRenderTime;
 	static float dt;
+	
+	ArrayList<Vector3f> levelBlocks;
 
 
 	//TODO: Feel free to change the window title and default animation scale here
@@ -226,6 +230,42 @@ public class CS2150Coursework extends GraphicsLab
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
+		
+		
+		/*
+		 * Build the level blocks
+		 */
+		LevelReader lvlReader = new LevelReader(1);
+		levelBlocks = new ArrayList<Vector3f>();
+		
+		String lvlLine = lvlReader.getNextLine();
+		
+		String[] lvlDimensions = lvlLine.split("x");
+		levelWidth = Integer.parseInt(lvlDimensions[0]);
+		levelHeight = Integer.parseInt(lvlDimensions[1]);
+		Vector3f startCornerPos = new Vector3f(0.5f - (levelWidth / 2), 0.5f, 0.5f - (levelHeight / 2));
+		
+		int lineCount = 0;
+		lvlLine = lvlReader.getNextLine();
+		while(lvlLine != null){
+			//For each symbol check if it's a block or tank
+			//If so, handle it appropriately
+			char[] items = lvlLine.toCharArray();
+			for(int i = 0; i < items.length; i++){
+				switch(items[i]){
+				case '@'://Build a wall
+					levelBlocks.add(new Vector3f(startCornerPos.getX() + i, startCornerPos.getY(), startCornerPos.getZ() + lineCount));
+					break;
+				default:
+					//Do nothing, we will assume empty space
+					break;
+				}
+			}
+			
+			lvlLine = lvlReader.getNextLine();
+			lineCount++;
+		}
 	}
 
 	protected void checkSceneInput()
@@ -296,7 +336,7 @@ public class CS2150Coursework extends GraphicsLab
 			GL11.glPushMatrix();
 			{
 				GL11.glTranslatef(0.0f, -0.5f, -0.0f);
-				GL11.glScalef(10f, 1f, 10f);
+				GL11.glScalef(levelWidth, 1f, levelHeight);
 
 				// enable texturing and bind an appropriate texture
 				GL11.glEnable(GL11.GL_TEXTURE_2D);
@@ -308,6 +348,27 @@ public class CS2150Coursework extends GraphicsLab
 			}
 			GL11.glPopMatrix();
 
+			
+			
+			/*
+			 * Draw all blocks in world
+			 */
+			// enable texturing and bind an appropriate texture
+			GL11.glEnable(GL11.GL_TEXTURE_2D);
+			GL11.glBindTexture(GL11.GL_TEXTURE_2D, woodFloorTexture.getTextureID());
+			
+			for(Vector3f block : levelBlocks){
+				GL11.glPushMatrix();
+				{
+					GL11.glTranslatef(block.getX(), block.getY(), block.getZ());
+					drawUnitCube();
+				}
+				GL11.glPopMatrix();
+			}
+			
+			GL11.glDisable(GL11.GL_TEXTURE_2D);
+			
+			
 
 			/**
 			 * Render tank here!
